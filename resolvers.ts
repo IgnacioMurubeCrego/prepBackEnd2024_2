@@ -15,6 +15,16 @@ type MutationAddContactArgs = {
 	phone: string;
 };
 
+type MutationDeleteContactArgs = {
+	id: string;
+};
+
+type MutationUpdateContactArgs = {
+	id: string;
+	name: string;
+	phone?: string;
+};
+
 export const resolvers = {
 	Contact: {
 		id: (parent: ContactModel) => {
@@ -87,6 +97,53 @@ export const resolvers = {
 				country,
 				timezone,
 			};
+		},
+		deleteContact: async (_parent: unknown, args: MutationDeleteContactArgs, ctx: Context): Promise<boolean> => {
+			const contactExists = await ctx.ContactCollection.countDocuments({ _id: new ObjectId(args.id) });
+			if (contactExists === 0) throw new GraphQLError("Contact does not exist in DB");
+
+			const { deletedCount } = await ctx.ContactCollection.deleteOne({ _id: new ObjectId(args.id) });
+
+			if (deletedCount === 0) return false;
+			else return true;
+		},
+		updateContact: async (_parent: unknown, args: MutationUpdateContactArgs, ctx: Context): Promise<ContactModel> => {
+			const { id, name, phone } = args;
+
+			if (!phone) {
+				const newContact = await ctx.ContactCollection.findOneAndUpdate({ _id: new ObjectId(id) }, { $set: { name } });
+				if (!newContact) throw new GraphQLError("Contact does not exist in DB");
+				return newContact;
+			}
+
+			const phoneExists = await ctx.ContactCollection.countDocuments({ phone });
+			if (phoneExists !== 0) throw new GraphQLError("Phone already exists in DB");
+
+			const API_KEY = Deno.env.get("API_KEY");
+			if (!API_KEY) throw new GraphQLError("API_KEY needed to validate phone through API Ninjas");
+			const url = "https://api.api-ninjas.com/v1/validatephone?number=" + phone;
+
+			// Validate Phone
+			const valPhoneData = await fetch(url, {
+				headers: {
+					"X-Api-Key": API_KEY,
+				},
+			});
+
+			if (valPhoneData.status !== 200) throw new GraphQLError("API Ninja Validate Phone Error");
+
+			const response: APIvalidatephone = await valPhoneData.json();
+
+			if (!response.is_valid) throw new GraphQLError("Phone is not valid");
+			const country = response.country;
+			const timezone = response.timezones[0];
+
+			const newContact = await ctx.ContactCollection.findOneAndUpdate(
+				{ _id: new ObjectId(id) },
+				{ $set: { name, phone, country, timezone } }
+			);
+			if (!newContact) throw new GraphQLError("Contact does not exist in DB");
+			return newContact;
 		},
 	},
 };
