@@ -52,7 +52,7 @@ export const resolvers = {
 			const { name, phone } = args;
 
 			const phoneExists = await ctx.ContactCollection.countDocuments({ phone });
-			if (!phoneExists) throw new GraphQLError("Phone already exists in DB");
+			if (phoneExists !== 0) throw new GraphQLError("Phone already exists in DB");
 
 			const API_KEY = Deno.env.get("API_KEY");
 			if (!API_KEY) throw new GraphQLError("API_KEY needed to validate phone through API Ninjas");
