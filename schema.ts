@@ -1,16 +1,22 @@
 export const schema = `#graphql
 
-type Test{
+type Contact{
     id: ID!
-    msg: String!
+    name: String!
+    phone: String!
+    country: String!
+    datetime: String!
 }
 
 type Query{
-    test: [Test!]!
+  getContacts: [Contact!]!
+  getContact(id: ID!): Contact
 }
 
 type Mutation{
-  addTest(msg:String!): Test! 
+  addContact(name: String!,phone: String!): Contact! 
+  deleteContact(id: ID!): Boolean!
+  updateContact(id: ID!,name: String!,phone: String): Contact
 }
 
 `;
